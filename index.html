@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAP ROYALE - Neon Arcade</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#26346c,#0a0d1b 70%);color:#fff;font-family:system-ui,Arial;min-height:100vh}
+main{max-width:700px;margin:auto;padding:22px 16px;text-align:center}
+h1{font-size:clamp(36px,8vw,62px);letter-spacing:-2px;margin:10px 0 0;text-shadow:0 0 25px #45d9ff55}
+h1 span{color:#55e9ff}p{color:#aab8d5}.panel{background:#151d34;border:1px solid #334367;border-radius:23px;padding:22px;margin:16px 0;box-shadow:0 12px 35px #0005}
+input,button{font:inherit;border-radius:13px;padding:12px;border:1px solid #42517b}
+input{background:#0c1429;color:white;width:min(100%,300px)}
+button{cursor:pointer;font-weight:800;color:white;background:#24345a}
+.primary{background:linear-gradient(100deg,#2eddf5,#8d6bff);color:#071225;border:0}
+button:disabled{opacity:.45;cursor:not-allowed}
+#timer{font-size:48px;font-weight:900;color:#ffd567}
+#target{font-size:72px;width:180px;height:180px;border-radius:40px;background:linear-gradient(145deg,#24477c,#4a2878);border:2px solid #70caff;box-shadow:0 0 45px #36dfff66;margin:14px auto;display:block;transition:transform .1s}
+#target:active{transform:scale(.9)}
+.row{display:flex;justify-content:space-between;gap:12px;background:#0d162b;border-radius:12px;padding:12px;margin:8px 0}
+#message{min-height:24px;color:#58edff;font-weight:700}
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pod{border:1px solid #455477;background:#111a30;border-radius:13px;padding:15px 5px;overflow-wrap:anywhere}
+.pod strong{font-size:29px}.pod small{color:#aab8d5}
+</style>
+</head>
+<body>
+<main>
+<div style="letter-spacing:3px;color:#a9b7d7;font-size:12px">NEON ARCADE CHAMPIONSHIP</div>
+<h1>TAP <span>ROYALE</span></h1>
+<p>Tekan target secepat mungkin! Kalahkan skor lawan dan rebut podium.</p>
+<div class="panel">
+<input id="name" maxlength="16" placeholder="Nama pemain" value="Pemain 1">
+<button id="start" class="primary">MULAI GAME</button>
+<button id="sound">♫ MUSIK OFF</button>
+</div>
+<div class="panel">
+<div id="timer">00:30</div>
+<div id="message">Masukkan nama dan tekan MULAI GAME</div>
+<button id="target" disabled>⚡</button>
+<p>Target berpindah setiap kali ditekan. Kamu punya 30 detik!</p>
+<div class="row"><span>SKOR KAMU</span><b id="score">0</b></div>
+<div class="row"><span>REKOR TERTINGGI</span><b id="best">0</b></div>
+</div>
+<div class="panel">
+<h2>🏆 PODIUM JUARA 1, 2, 3</h2>
+<div class="podium" id="podium"></div>
+<button id="reset">RESET PODIUM</button>
+</div>
+<p style="font-size:12px">Game ini berjalan offline di Chrome. Skor tersimpan pada browser perangkat ini.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let score=0,time=30,timer=null,playing=false,music=false,audio=null,musicTimer=null;
+const emojis=["⚡","💎","🔥","⭐","🚀","🎯","👑"];
+let scores=[];
+try{scores=JSON.parse(localStorage.getItem("tapRoyaleScores")||"[]")}catch(e){}
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function render(){
+ $("score").textContent=score;
+ $("best").textContent=scores.length?Math.max(...scores.map(x=>x.score)):0;
+ $("podium").innerHTML=[0,1,2].map((i)=>{
+ let p=scores[i],medal=["🥇","🥈","🥉"][i];
+ return `<div class="pod"><strong>${medal}</strong><div>${p?escapeHTML(p.name):"—"}</div><small>${p?p.score+" poin":"Juara "+(i+1)}</small></div>`
+ }).join("");
+}
+function finish(){
+ clearInterval(timer);playing=false;$("target").disabled=true;$("start").disabled=false;
+ const name=$("name").value.trim()||"Pemain";
+ scores.push({name,score});
+ scores.sort((a,b)=>b.score-a.score);
+ scores=scores.slice(0,10);
+ try{localStorage.setItem("tapRoyaleScores",JSON.stringify(scores))}catch(e){}
+ $("message").textContent="Selesai! "+name+" mendapatkan "+score+" poin!";
+ render();
+}
+$("start").onclick=()=>{
+ clearInterval(timer);score=0;time=30;playing=true;
+ $("start").disabled=true;$("target").disabled=false;
+ $("timer").textContent="00:30";$("message").textContent="GO! TAP SECEPATNYA!";
+ $("target").textContent="⚡";render();
+ timer=setInterval(()=>{
+ time--;$("timer").textContent="00:"+String(time).padStart(2,"0");
+ if(time<=0)finish();
+ },1000);
+};
+$("target").onclick=()=>{
+ if(!playing)return;
+ score++;$("score").textContent=score;
+ $("target").textContent=emojis[Math.floor(Math.random()*emojis.length)];
+ $("target").style.transform="rotate("+(Math.random()*18-9)+"deg)";
+ $("target").style.background=`linear-gradient(145deg,hsl(${Math.floor(Math.random()*360)} 65% 32%),#25234f)`;
+ if(audio)beep(660,0.055,.06);
+};
+$("reset").onclick=()=>{
+ if(!confirm("Hapus semua skor podium?"))return;
+ scores=[];try{localStorage.removeItem("tapRoyaleScores")}catch(e){}render();
+};
+function beep(freq,duration,volume){
+ if(!audio)return;
+ let osc=audio.createOscillator(),gain=audio.createGain();
+ osc.type="triangle";osc.frequency.value=freq;
+ gain.gain.setValueAtTime(volume,audio.currentTime);
+ gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);
+ osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+duration);
+}
+$("sound").onclick=async()=>{
+ music=!music;$("sound").textContent=music?"♫ MUSIK ON":"♫ MUSIK OFF";
+ if(music){
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC){$("message").textContent="Audio tidak didukung browser ini";return}
+ if(!audio)audio=new AC();
+ await audio.resume();
+ let notes=[261.63,329.63,392,523.25,493.88,392,329.63,293.66],i=0;
+ musicTimer=setInterval(()=>{if(music)beep(notes[i++%notes.length],.2,.025)},260);
+ }else{clearInterval(musicTimer)}
+};
+render();
+</script>
+</body>
+</html>
